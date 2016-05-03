@@ -1,0 +1,117 @@
+buildscript {
+	ext {
+		springBootVersion = '1.3.3.RELEASE'
+	}
+	repositories {
+		mavenCentral()
+		jcenter()
+	}
+	dependencies {
+		classpath 'no.nils:wsdl2java:0.9'
+		classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+		classpath "io.spring.gradle:dependency-management-plugin:0.5.3.RELEASE"
+
+
+	}
+}
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'no.nils.wsdl2java'
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+
+repositories {
+	mavenCentral()
+}
+
+// tag::xsd[]
+task genJaxb {
+	ext.sourcesDir = "${buildDir}/generated-sources/jaxb"
+	ext.classesDir = "${buildDir}/classes/jaxb"
+	ext.schema = "src/main/resources/xsd/spiRequestResponse.xsd"
+
+	outputs.dir classesDir
+
+	doLast() {
+		project.ant {
+			taskdef name: "xjc", classname: "com.sun.tools.xjc.XJCTask",
+					classpath: configurations.jaxb.asPath
+			mkdir(dir: sourcesDir)
+			mkdir(dir: classesDir)
+
+			xjc(destdir: sourcesDir, schema: schema) {
+				arg(value: "-wsdl")
+				produces(dir: sourcesDir, includes: "**/*.java")
+			}
+
+			javac(destdir: classesDir, source: 1.6, target: 1.6, debug: true,
+					debugLevel: "lines,vars,source",
+					classpath: configurations.jaxb.asPath) {
+				src(path: sourcesDir)
+				include(name: "**/*.java")
+				include(name: "*.java")
+			}
+
+			copy(todir: classesDir) {
+				fileset(dir: sourcesDir, erroronmissingdir: false) {
+					exclude(name: "**/*.java")
+				}
+			}
+		}
+	}
+}
+
+wsdl2java{
+	wsdlsToGenerate = [
+			[file('src/main/resources/wsdl/bwl_1_1.wsdl')],
+			[file('src/main/resources/wsdl/score_1_1.wsdl')]
+	]
+
+	generatedWsdlDir = file("generatedsources/wsdl2java")
+	wsdlDir = file("src/main/resources/wsdl")
+	ext.cxfVersion = "2.5.1"
+}
+
+
+sourceSets{
+	main.java.srcDirs +=[wsdl2java.generatedWsdlDir]
+}
+
+
+// end::xsd[]
+
+task afterEclipseImport {
+	dependsOn "genJaxb"
+}
+
+// tag::jaxb[]
+configurations {
+	jaxb
+}
+
+jar {
+	baseName = 'wsdlCreatorGradle'
+	version =  '0.1.0'
+	from genJaxb.classesDir
+}
+
+// tag::dependencies[]
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+	compile('org.springframework.boot:spring-boot-starter-ws')
+	testCompile('org.springframework.boot:spring-boot-starter-test')
+	compile("wsdl4j:wsdl4j:1.6.1")
+	jaxb("com.sun.xml.bind:jaxb-xjc:2.2.4-1")
+	compile(files(genJaxb.classesDir).builtBy(genJaxb))
+}
+
+
+eclipse {
+	classpath {
+		 containers.remove('org.eclipse.jdt.launching.JRE_CONTAINER')
+		 containers 'org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.8'
+	}
+}
