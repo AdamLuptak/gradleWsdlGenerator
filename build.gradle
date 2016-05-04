@@ -106,6 +106,8 @@ dependencies {
 	compile("wsdl4j:wsdl4j:1.6.1")
 	jaxb("com.sun.xml.bind:jaxb-xjc:2.2.4-1")
 	compile(files(genJaxb.classesDir).builtBy(genJaxb))
+	compile('org.jvnet.hyperjaxb3:hyperjaxb3:0.6.0')
+
 }
 
 
